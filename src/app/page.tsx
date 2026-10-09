@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, GraduationCap } from "lucide-react";
+import ThemeToggle from "@/components/theme-toggle";
 export default function Home() {
   return (
     <main className="landing">
@@ -10,9 +11,12 @@ export default function Home() {
           </span>
           CampusHub<span className="brand-dot">.</span>
         </Link>
-        <Link className="button secondary" href="/auth">
-          Sign in <ArrowUpRight size={16} />
-        </Link>
+        <div className="landing-actions">
+          <ThemeToggle compact />
+          <Link className="button secondary" href="/auth">
+            Sign in <ArrowUpRight size={16} />
+          </Link>
+        </div>
       </nav>
       <section className="landing-hero">
         <h1>
