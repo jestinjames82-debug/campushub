@@ -15,6 +15,7 @@ export default async function Page({
       "settings",
       "onboarding",
       "planner",
+      "attendance",
       "study",
       "performance",
       "community",
