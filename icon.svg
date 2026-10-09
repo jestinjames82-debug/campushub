@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">CampusHub</title>
+  <desc id="desc">A campus roof above an open book</desc>
+  <rect width="192" height="192" rx="42" fill="#22314f"/>
+  <path d="m27 77 69-34 69 34-69 34Z" fill="#fff"/>
+  <path d="M50 93v38l46 19 46-19V93" fill="none" stroke="#8cc7b8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 111v39M165 78v58" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+</svg>
