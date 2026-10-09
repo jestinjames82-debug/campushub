@@ -7,7 +7,9 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronRight,
+  ClipboardCheck,
   GraduationCap,
   Layers3,
   LayoutDashboard,
@@ -25,6 +27,7 @@ import { browserClient } from "@/lib/supabase/client";
 import dynamic from "next/dynamic";
 import WorkspacePreferences from "./workspace-preferences";
 import { cleanupDemoSubjects } from "@/lib/records";
+import ThemeToggle from "./theme-toggle";
 const AcademicTools = dynamic(() => import("./academic-tools"), {
   loading: () => <p className="loading">Opening academic tools…</p>,
 });
@@ -57,6 +60,7 @@ const nav = [
   { slug: "subjects", label: "My subjects", icon: BookOpen },
   { slug: "terms", label: "Academic terms", icon: CalendarDays },
   { slug: "planner", label: "Planner", icon: CalendarDays },
+  { slug: "attendance", label: "Attendance", icon: ClipboardCheck },
   { slug: "study", label: "Study workspace", icon: BookOpen },
   { slug: "performance", label: "Performance", icon: Layers3 },
   { slug: "community", label: "Community", icon: GraduationCap },
@@ -70,6 +74,7 @@ const hindiLabels: Record<string, string> = {
   subjects: "मेरे विषय",
   terms: "शैक्षणिक सत्र",
   planner: "योजनाकार",
+  attendance: "उपस्थिति",
   study: "अध्ययन",
   performance: "प्रदर्शन",
   community: "समुदाय",
@@ -130,12 +135,19 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
         if (active) {
           setData(result);
           const today = new Date().toISOString().slice(0, 10);
+          const storedSelection = localStorage.getItem(
+            `campushub-selected-term-${demo ? "demo" : userId}`,
+          );
           setSelected(
-            (
-              result.terms.find(
-                (t) => t.starts_on <= today && t.ends_on >= today,
-              ) || result.terms[0]
-            )?.id || "",
+            (storedSelection &&
+              result.terms.some((term) => term.id === storedSelection) &&
+              storedSelection) ||
+              (
+                result.terms.find(
+                  (t) => t.starts_on <= today && t.ends_on >= today,
+                ) || result.terms[0]
+              )?.id ||
+              "",
           );
           if (!result.profile && view !== "onboarding")
             router.replace(`${base}/onboarding`);
@@ -156,6 +168,13 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
       active = false;
     };
   }, [demo, userId, base, router, view]);
+  useEffect(() => {
+    if (selected)
+      localStorage.setItem(
+        `campushub-selected-term-${demo ? "demo" : userId}`,
+        selected,
+      );
+  }, [demo, selected, userId]);
   useEffect(() => {
     if (editor) dialog.current?.showModal();
     else dialog.current?.close();
@@ -425,6 +444,7 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
             <span className="private-label">
               <ShieldCheck size={15} /> Personal workspace
             </span>
+            <ThemeToggle compact />
             <span className="avatar small">
               {name.slice(0, 1).toUpperCase()}
             </span>
@@ -459,16 +479,31 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
                       ? "Every chapter of your college journey, organised."
                       : view === "onboarding"
                         ? "Tell us a little about your academic journey."
+                        : view === "attendance"
+                          ? "Record every class, see your percentage, and know what you need next."
                         : "A workspace that works the way you do."}
               </p>
             </div>
             {(view === "dashboard" || view === "subjects") && (
-              <button
-                onClick={() => setEditor({ kind: "subject" })}
-                disabled={!data.terms.length || loading}
-              >
-                <Plus size={17} /> Add subject
-              </button>
+              <div className="heading-actions">
+                <button
+                  type="button"
+                  className="secondary scroll-to-semester"
+                  onClick={() =>
+                    document
+                      .getElementById("semester-selection")
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                  }
+                >
+                  <ChevronDown size={16} /> Choose semester
+                </button>
+                <button
+                  onClick={() => setEditor({ kind: "subject" })}
+                  disabled={!data.terms.length || loading}
+                >
+                  <Plus size={17} /> Add subject
+                </button>
+              </div>
             )}
             {view === "terms" && (
               <button onClick={() => setEditor({ kind: "term" })}>
@@ -499,7 +534,11 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
             <>
               {(view === "dashboard" || view === "subjects") && (
                 <>
-                  <section className="semester-banner">
+                  <section
+                    id="semester-selection"
+                    className="semester-banner"
+                    tabIndex={-1}
+                  >
                     <div className="semester-icon">
                       <Layers3 size={27} />
                     </div>
@@ -779,13 +818,55 @@ export default function WorkspaceApp({ view, userId, email, demo }: Props) {
                   </aside>
                 </div>
               )}
-              {["planner", "performance"].includes(view) && (
+              {view === "attendance" && (
+                <section
+                  id="semester-selection"
+                  className="semester-banner attendance-term-banner"
+                  tabIndex={-1}
+                >
+                  <div className="semester-icon">
+                    <Layers3 size={23} />
+                  </div>
+                  <div>
+                    <span className="eyebrow">TRACKING TERM</span>
+                    <h2>{current?.name || "Choose a semester"}</h2>
+                    <p>Attendance is recorded separately for each semester.</p>
+                  </div>
+                  {data.terms.length ? (
+                    <label className="term-picker">
+                      <span className="sr-only">Attendance semester</span>
+                      <select
+                        aria-label="Attendance semester"
+                        value={selected}
+                        onChange={(event) => setSelected(event.target.value)}
+                      >
+                        {data.terms.map((term) => (
+                          <option key={term.id} value={term.id}>
+                            {term.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <Link className="button secondary" href={base + "/terms"}>
+                      Create a semester <ArrowRight size={16} />
+                    </Link>
+                  )}
+                </section>
+              )}
+              {["planner", "attendance", "performance"].includes(view) && (
                 <AcademicTools
-                  view={view as "planner" | "performance"}
+                  view={view as "planner" | "attendance" | "performance"}
                   demo={demo}
                   userId={userId}
                   profile={data.profile}
-                  subjects={data.subjects}
+                  subjects={
+                    view === "attendance" && selected
+                      ? data.subjects.filter(
+                          (subject) => subject.term_id === selected,
+                        )
+                      : data.subjects
+                  }
                   terms={data.terms}
                 />
               )}

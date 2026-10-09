@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { GraduationCap, ArrowRight } from "lucide-react";
 import { browserClient, configured } from "@/lib/supabase/client";
+import ThemeToggle from "./theme-toggle";
 export default function AuthForm() {
   const params = useSearchParams(),
     router = useRouter();
@@ -73,6 +74,9 @@ export default function AuthForm() {
         <small>One workspace. Any college. All yours.</small>
       </aside>
       <section>
+        <div className="auth-toolbar">
+          <ThemeToggle compact />
+        </div>
         <div className="auth-card">
           <span className="eyebrow">WELCOME TO CAMPUSHUB</span>
           <h2>

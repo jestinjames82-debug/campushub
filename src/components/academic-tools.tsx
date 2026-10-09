@@ -119,22 +119,31 @@ function useOperation() {
 }
 
 export default function AcademicTools(
-  props: FeatureProps & { view: "planner" | "performance" },
+  props: FeatureProps & { view: "planner" | "attendance" | "performance" },
 ) {
-  return props.view === "planner" ? (
-    <Planner {...props} />
-  ) : (
+  return props.view === "performance" ? (
     <Performance {...props} />
+  ) : (
+    <Planner
+      {...props}
+      initialTab={props.view === "attendance" ? "attendance" : "deadlines"}
+    />
   );
 }
 
-function Planner({ demo, userId, subjects, terms }: FeatureProps) {
+function Planner({
+  demo,
+  userId,
+  subjects,
+  terms,
+  initialTab = "deadlines",
+}: FeatureProps & { initialTab?: string }) {
   const tasks = useRecords<AcademicTask>("task", demo, userId);
   const classes = useRecords<ClassSlot>("class", demo, userId);
   const attendance = useRecords<AttendanceEntry>("attendance", demo, userId);
   const goals = useRecords<AcademicGoal>("goal", demo, userId);
   const operation = useOperation();
-  const [tab, setTab] = useState("deadlines");
+  const [tab, setTab] = useState(initialTab);
   const [taskEditor, setTaskEditor] = useState<
     Saved<AcademicTask> | "new" | null
   >(null);
@@ -149,6 +158,7 @@ function Planner({ demo, userId, subjects, terms }: FeatureProps) {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => setTab(initialTab), [initialTab]);
   const subjectName = (id: string) =>
     subjects.find((subject) => subject.id === id)?.name ??
     (id ? "Removed subject" : "General");
@@ -174,6 +184,15 @@ function Planner({ demo, userId, subjects, terms }: FeatureProps) {
   );
   const loading =
     tasks.loading || classes.loading || attendance.loading || goals.loading;
+  const countedAttendance = attendance.items.filter(
+    (entry) => entry.status === "present" || entry.status === "absent",
+  );
+  const presentAttendance = countedAttendance.filter(
+    (entry) => entry.status === "present",
+  ).length;
+  const overallAttendance = countedAttendance.length
+    ? Math.round((presentAttendance / countedAttendance.length) * 100)
+    : null;
 
   function saveTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -797,6 +816,23 @@ function Planner({ demo, userId, subjects, terms }: FeatureProps) {
 
       {tab === "attendance" ? (
         <>
+          <div
+            className="metric-grid attendance-summary"
+            aria-label="Attendance summary"
+          >
+            <Metric
+              label="Overall attendance"
+              value={round(overallAttendance, "%")}
+            />
+            <Metric label="Present sessions" value={presentAttendance} />
+            <Metric label="Sessions counted" value={countedAttendance.length} />
+            <Metric
+              label="Excused sessions"
+              value={attendance.items.filter(
+                (entry) => entry.status === "excused",
+              ).length}
+            />
+          </div>
           <div className="notice">
             Attendance uses the sessions you log. Excused sessions are excluded
             from the denominator; choose this only when your college allows it.
@@ -804,7 +840,11 @@ function Planner({ demo, userId, subjects, terms }: FeatureProps) {
             forecast.
           </div>
           <div className="feature-grid">
-            <form className="feature-form" onSubmit={saveAttendance}>
+            <form
+              id="attendance-log-form"
+              className="feature-form"
+              onSubmit={saveAttendance}
+            >
               <h2>Log attendance</h2>
               <div className="form-grid">
                 <Field label="Subject">
