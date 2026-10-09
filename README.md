@@ -2,6 +2,10 @@
 
 A responsive student workspace for any college in India, built with Next.js App Router, TypeScript, Tailwind CSS and Supabase. College, programme, branch and academic system are editable; students can use Semester, Trimester or Annual terms.
 
+**Live app:** [campushub-drab.vercel.app](https://campushub-drab.vercel.app/) · **Public source:** [github.com/jestinjames82-debug/campushub](https://github.com/jestinjames82-debug/campushub)
+
+Open the [demo dashboard](https://campushub-drab.vercel.app/demo/dashboard) to explore the hosted experience. The [attendance tracker](https://campushub-drab.vercel.app/demo/attendance), semester selector, subject workspace and light/dark theme are available without creating an account.
+
 This release adds working source across all eight roadmap areas. The personal tools and local demo are usable now. Hosted authentication, shared data, file storage, public portfolio publishing and AI need the corresponding services configured and verified before a production launch. See [deployment setup](DEPLOYMENT.md), [phase status](ROADMAP.md) and [verification evidence](VERIFICATION.md).
 
 ## Run locally
@@ -16,6 +20,22 @@ npm run dev
 Open `http://localhost:3000/demo/dashboard`. The labelled demo saves sample and edited records in this browser's local storage. Clearing site data removes them; they do not sync between devices or migrate into an account. Demo community members and institution verification are samples. Demo uploads are limited to 1 MB. Public publishing and AI generation require a connected account.
 
 For real accounts, follow [DEPLOYMENT.md](DEPLOYMENT.md), set `.env.local`, restart the app, then use `/auth` and `/app/dashboard`. Never place a Supabase secret/service-role key in a `NEXT_PUBLIC_*` variable.
+
+## Why this project stands out
+
+- **Student-first product design:** academic profile, terms, subjects, dashboard, planner, attendance, study tools, performance, community and career workflows in one calm workspace.
+- **Production-minded foundation:** Supabase authentication, owner-based row-level security, scoped private storage, safe exports and responsive App Router pages.
+- **Useful interaction details:** term-scoped records, attendance targets and forecasts, persistent theme preference, Hindi navigation labels and mobile-friendly layouts.
+- **Deployed and verifiable:** public GitHub source, Vercel hosting, automated checks and a live demo that can be reviewed immediately.
+
+## Live demo routes
+
+| Route | What to review |
+| --- | --- |
+| [Dashboard](https://campushub-drab.vercel.app/demo/dashboard) | Selected semester, subject overview and responsive shell |
+| [Attendance](https://campushub-drab.vercel.app/demo/attendance) | Session logging, summaries, targets, forecasts and filtering |
+| [Subjects](https://campushub-drab.vercel.app/demo/subjects) | Subject records and semester-scoped academic data |
+| [Academic terms](https://campushub-drab.vercel.app/demo/terms) | Semester, trimester or annual term management |
 
 ## Included features
 
@@ -54,7 +74,7 @@ npm test
 
 Browser tests launch the production build on port 3100 and cover desktop/mobile demo flows. Unit tests cover academic calculations, calendar exports, safe resources and source citations. SQL tests execute migrations against PGlite with minimal Supabase-compatible auth/storage fixtures to exercise ownership, role boundaries and policies. They do not prove that a hosted Supabase project's configuration, Storage service or email delivery is correct. See [VERIFICATION.md](VERIFICATION.md) for the recorded results and live checks still required.
 
-The project includes exact dependency versions and a lockfile, `.env.example`, `.gitignore`, GitHub Actions CI, `vercel.json` and five ordered SQL migrations. CI checks the source; it does not create a repository, configure accounts or publish to Vercel. No hosted target is selected in this source deliverable.
+The project includes exact dependency versions and a lockfile, `.env.example`, `.gitignore`, GitHub Actions CI, `vercel.json` and five ordered SQL migrations. CI checks the source; the hosted demo is deployed separately through the linked Vercel project and uses its configured environment variables.
 
 ## Remaining release work
 
