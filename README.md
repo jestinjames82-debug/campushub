@@ -1,4 +1,4 @@
-# CampusHub 2.0
+# CampusHub 
 
 A responsive student workspace for any college in India, built with Next.js App Router, TypeScript, Tailwind CSS and Supabase. College, programme, branch and academic system are editable; students can use Semester, Trimester or Annual terms.
 
