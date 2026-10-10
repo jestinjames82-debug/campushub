@@ -1,33 +1,21 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GraduationCap, ArrowRight } from "lucide-react";
 import { browserClient, configured } from "@/lib/supabase/client";
+import {
+  SIGNUP_COOLDOWN_KEY,
+  SIGNUP_COOLDOWN_MS,
+  acquireSignupRequestLock,
+  authMessage,
+  isRateLimitError,
+  readStoredTimestamp,
+  releaseSignupRequestLock,
+  signupRedirectUrl,
+  writeStoredTimestamp,
+} from "@/lib/supabase/auth";
 import ThemeToggle from "./theme-toggle";
-
-const SIGNUP_COOLDOWN_MS = 60_000;
-const SIGNUP_COOLDOWN_KEY = "campushub-signup-cooldown";
-
-function isRateLimitError(error: unknown) {
-  return /rate limit|too many|security purposes|email.*limit/i.test(
-    error instanceof Error ? error.message : String(error),
-  );
-}
-
-function authMessage(error: unknown, signup: boolean) {
-  if (isRateLimitError(error)) {
-    return signup
-      ? "Email confirmation is temporarily limited. Wait a minute before trying once more. If you already created an account, use Sign in. You can also use the demo below without email."
-      : "Too many attempts were made. Wait a minute, then try signing in again.";
-  }
-  if (/already registered|already exists/i.test(error instanceof Error ? error.message : String(error))) {
-    return "This email already has an account. Switch to Sign in instead.";
-  }
-  return error instanceof Error && error.message
-    ? error.message
-    : "Unable to sign in. Try again.";
-}
 
 export default function AuthForm() {
   const params = useSearchParams(),
@@ -41,9 +29,10 @@ export default function AuthForm() {
         ? "Confirmation link expired or invalid. Please sign in or request another link."
         : "",
     );
+  const submitLock = useRef(false);
 
   useEffect(() => {
-    const stored = Number(window.localStorage.getItem(SIGNUP_COOLDOWN_KEY));
+    const stored = readStoredTimestamp(SIGNUP_COOLDOWN_KEY);
     if (stored > Date.now()) setSignupCooldownUntil(stored);
   }, []);
 
@@ -54,7 +43,7 @@ export default function AuthForm() {
       setSignupCooldownSeconds(Math.ceil(remaining / 1000));
       if (!remaining) {
         setSignupCooldownUntil(0);
-        window.localStorage.removeItem(SIGNUP_COOLDOWN_KEY);
+        writeStoredTimestamp(SIGNUP_COOLDOWN_KEY, 0);
       }
     };
     tick();
@@ -64,16 +53,30 @@ export default function AuthForm() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     const form = new FormData(event.currentTarget);
-    if (signup && signupCooldownUntil > Date.now()) {
-      setMessage(
-        `Please wait ${Math.ceil((signupCooldownUntil - Date.now()) / 1000)} seconds before requesting another confirmation email.`,
-      );
-      return;
-    }
-    setBusy(true);
-    setMessage("");
+    let requestLock = 0;
     try {
+      const storedCooldown = readStoredTimestamp(SIGNUP_COOLDOWN_KEY);
+      const cooldownUntil = Math.max(signupCooldownUntil, storedCooldown);
+      if (signup && cooldownUntil > Date.now()) {
+        setSignupCooldownUntil(cooldownUntil);
+        setMessage(
+          `Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)} seconds before requesting another confirmation email.`,
+        );
+        return;
+      }
+      const lock = signup ? acquireSignupRequestLock() : 1;
+      if (signup && !lock) {
+        setMessage(
+          "A signup request is already being processed in another tab. Wait for it to finish before trying again.",
+        );
+        return;
+      }
+      requestLock = lock;
+      setBusy(true);
+      setMessage("");
       const client = browserClient();
       const email = String(form.get("email")).trim(),
         password = String(form.get("password"));
@@ -81,7 +84,7 @@ export default function AuthForm() {
         ? await client.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo: `${location.origin}/auth/callback` },
+            options: { emailRedirectTo: signupRedirectUrl(location.origin) },
           })
         : await client.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
@@ -89,7 +92,7 @@ export default function AuthForm() {
         const cooldown = Date.now() + SIGNUP_COOLDOWN_MS;
         setSignupCooldownUntil(cooldown);
         setSignupCooldownSeconds(Math.ceil(SIGNUP_COOLDOWN_MS / 1000));
-        window.localStorage.setItem(SIGNUP_COOLDOWN_KEY, String(cooldown));
+        writeStoredTimestamp(SIGNUP_COOLDOWN_KEY, cooldown);
         setMessage(
           "Check your email to confirm your account, then return here to sign in. If it does not arrive, check spam and wait before requesting another email.",
         );
@@ -102,11 +105,13 @@ export default function AuthForm() {
         const cooldown = Date.now() + SIGNUP_COOLDOWN_MS;
         setSignupCooldownUntil(cooldown);
         setSignupCooldownSeconds(Math.ceil(SIGNUP_COOLDOWN_MS / 1000));
-        window.localStorage.setItem(SIGNUP_COOLDOWN_KEY, String(cooldown));
+        writeStoredTimestamp(SIGNUP_COOLDOWN_KEY, cooldown);
       }
       setMessage(authMessage(error, signup));
     } finally {
       setBusy(false);
+      releaseSignupRequestLock(requestLock);
+      submitLock.current = false;
     }
   }
   return (

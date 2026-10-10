@@ -112,9 +112,9 @@ async function loadTableRows<T>(
     } else if (cursor) query = query.gt(primaryKey, cursor);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []).map((row) => ({
+    return (data || []).map((row: Record<string, unknown>) => ({
       id: secondaryKey
-        ? `${row[primaryKey]}:${row[secondaryKey]}`
+        ? `${String(row[primaryKey])}:${String(row[secondaryKey])}`
         : String(row[primaryKey]),
       row: row as T,
     }));
