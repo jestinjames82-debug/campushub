@@ -1,25 +1,78 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GraduationCap, ArrowRight } from "lucide-react";
 import { browserClient, configured } from "@/lib/supabase/client";
 import ThemeToggle from "./theme-toggle";
+
+const SIGNUP_COOLDOWN_MS = 60_000;
+const SIGNUP_COOLDOWN_KEY = "campushub-signup-cooldown";
+
+function isRateLimitError(error: unknown) {
+  return /rate limit|too many|security purposes|email.*limit/i.test(
+    error instanceof Error ? error.message : String(error),
+  );
+}
+
+function authMessage(error: unknown, signup: boolean) {
+  if (isRateLimitError(error)) {
+    return signup
+      ? "Email confirmation is temporarily limited. Wait a minute before trying once more. If you already created an account, use Sign in. You can also use the demo below without email."
+      : "Too many attempts were made. Wait a minute, then try signing in again.";
+  }
+  if (/already registered|already exists/i.test(error instanceof Error ? error.message : String(error))) {
+    return "This email already has an account. Switch to Sign in instead.";
+  }
+  return error instanceof Error && error.message
+    ? error.message
+    : "Unable to sign in. Try again.";
+}
+
 export default function AuthForm() {
   const params = useSearchParams(),
     router = useRouter();
   const [signup, setSignup] = useState(params.get("mode") === "signup"),
     [busy, setBusy] = useState(false),
+    [signupCooldownUntil, setSignupCooldownUntil] = useState(0),
+    [signupCooldownSeconds, setSignupCooldownSeconds] = useState(0),
     [message, setMessage] = useState(
       params.has("error")
         ? "Confirmation link expired or invalid. Please sign in or request another link."
         : "",
     );
+
+  useEffect(() => {
+    const stored = Number(window.localStorage.getItem(SIGNUP_COOLDOWN_KEY));
+    if (stored > Date.now()) setSignupCooldownUntil(stored);
+  }, []);
+
+  useEffect(() => {
+    if (!signupCooldownUntil) return;
+    const tick = () => {
+      const remaining = Math.max(0, signupCooldownUntil - Date.now());
+      setSignupCooldownSeconds(Math.ceil(remaining / 1000));
+      if (!remaining) {
+        setSignupCooldownUntil(0);
+        window.localStorage.removeItem(SIGNUP_COOLDOWN_KEY);
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [signupCooldownUntil]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    if (signup && signupCooldownUntil > Date.now()) {
+      setMessage(
+        `Please wait ${Math.ceil((signupCooldownUntil - Date.now()) / 1000)} seconds before requesting another confirmation email.`,
+      );
+      return;
+    }
     setBusy(true);
     setMessage("");
-    const form = new FormData(event.currentTarget);
     try {
       const client = browserClient();
       const email = String(form.get("email")).trim(),
@@ -32,20 +85,26 @@ export default function AuthForm() {
           })
         : await client.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
-      if (signup && !result.data.session)
+      if (signup && !result.data.session) {
+        const cooldown = Date.now() + SIGNUP_COOLDOWN_MS;
+        setSignupCooldownUntil(cooldown);
+        setSignupCooldownSeconds(Math.ceil(SIGNUP_COOLDOWN_MS / 1000));
+        window.localStorage.setItem(SIGNUP_COOLDOWN_KEY, String(cooldown));
         setMessage(
-          "Check your email to confirm your account, then return here to sign in.",
+          "Check your email to confirm your account, then return here to sign in. If it does not arrive, check spam and wait before requesting another email.",
         );
-      else {
+      } else {
         router.replace("/app/dashboard");
         router.refresh();
       }
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to sign in. Try again.",
-      );
+      if (signup && isRateLimitError(error)) {
+        const cooldown = Date.now() + SIGNUP_COOLDOWN_MS;
+        setSignupCooldownUntil(cooldown);
+        setSignupCooldownSeconds(Math.ceil(SIGNUP_COOLDOWN_MS / 1000));
+        window.localStorage.setItem(SIGNUP_COOLDOWN_KEY, String(cooldown));
+      }
+      setMessage(authMessage(error, signup));
     } finally {
       setBusy(false);
     }
@@ -116,8 +175,20 @@ export default function AuthForm() {
                 placeholder="At least 8 characters"
               />
             </label>
-            <button disabled={busy || !configured}>
-              {busy ? "Please wait…" : signup ? "Create account" : "Sign in"}
+            <button
+              disabled={
+                busy ||
+                !configured ||
+                (signup && signupCooldownUntil > Date.now())
+              }
+            >
+              {busy
+                ? "Please wait…"
+                : signup && signupCooldownSeconds > 0
+                  ? `Try again in ${signupCooldownSeconds}s`
+                  : signup
+                    ? "Create account"
+                    : "Sign in"}
               <ArrowRight size={17} />
             </button>
           </form>
