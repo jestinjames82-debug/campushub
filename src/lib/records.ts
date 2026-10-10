@@ -70,7 +70,11 @@ export function useRecords<T extends object>(
           throw new Error("This saved demo data could not be read.");
         if (!saved) localStorage.setItem(key, JSON.stringify(next));
       } else {
-        const data = await loadAllRows(async (cursor) => {
+        const data = await loadAllRows<{
+          id: string;
+          data: Record<string, unknown>;
+          created_at: string;
+        }>(async (cursor) => {
           let query = browserClient()
             .from("workspace_records")
             .select("id,data,created_at")
@@ -84,7 +88,7 @@ export function useRecords<T extends object>(
         });
         next = data
           .sort((a, b) => b.created_at.localeCompare(a.created_at))
-          .map((row) => ({ ...row.data, id: row.id }));
+          .map((row) => ({ ...row.data, id: row.id }) as T & { id: string });
       }
       if (mounted.current) {
         current.current = next;
